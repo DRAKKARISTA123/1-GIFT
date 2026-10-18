@@ -2,13 +2,13 @@ import json
 import os
 import urllib.error
 import urllib.request
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import streamlit as st
 
 st.set_page_config(page_title="Private AI Hub", page_icon="🛡️", layout="wide")
 
-# Privacy-first defaults: local Ollama, no telemetry/tracing, no persistent chat storage.
+# Privacy-first defaults: no telemetry/tracing, no persistent chat storage.
 os.environ.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
 os.environ.setdefault("LANGCHAIN_TRACING_V2", "false")
 os.environ.setdefault("LANGSMITH_TRACING", "false")
@@ -37,8 +37,12 @@ SECTION_PROMPTS = {
 ROUTE_KEYWORDS = {
     "Math": ["integral", "algebra", "math", "equation", "geometry", "calculate", "derivative", "probability"],
     "Philosophy": ["meaning of life", "ethics", "existence", "truth", "philosophy", "morality", "consciousness"],
-    "Health information": ["fever", "pain", "headache", "health", "doctor", "medicine", "symptom", "diagnosis", "sleep"],
+    "Health information": [
+        "fever", "pain", "headache", "health", "doctor", "medicine", "symptom", "diagnosis", "sleep",
+        "disease", "celiac", "coeliac", "allergy", "intolerance",
+    ],
 }
+
 
 def keyword_route(text: str) -> str:
     lower = text.lower()
@@ -46,6 +50,7 @@ def keyword_route(text: str) -> str:
         if any(word in lower for word in words):
             return category
     return "General assistant"
+
 
 def local_ollama_chat(messages: List[Dict[str, str]], model: str, url: str) -> str:
     payload = json.dumps({"model": model, "messages": messages, "stream": False}).encode("utf-8")
@@ -60,17 +65,18 @@ def local_ollama_chat(messages: List[Dict[str, str]], model: str, url: str) -> s
             f"Details: {exc}"
         ) from exc
 
+
 def groq_chat(messages: List[Dict[str, str]], model: str, api_key: str) -> str:
     # Groq is a cloud API: prompts and conversation context are sent to Groq for inference.
     payload = json.dumps({"model": model, "messages": messages, "temperature": 0.3}).encode("utf-8")
     req = urllib.request.Request(
         "https://api.groq.com/openai/v1/chat/completions",
         data=payload,
-      headers={
-    "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}",
-    "User-Agent": "private-ai-hub/1.0",
-},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": "private-ai-hub/1.0",
+        },
         method="POST",
     )
     try:
@@ -83,12 +89,14 @@ def groq_chat(messages: List[Dict[str, str]], model: str, api_key: str) -> str:
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Could not connect to Groq: {exc}") from exc
 
+
 def generate(messages: List[Dict[str, str]], provider: str, model: str, ollama_url: str, api_key: str) -> str:
     if provider == "Local Ollama (privacy-first)":
         return local_ollama_chat(messages, model, ollama_url)
     if not api_key:
-        raise RuntimeError("Enter a Groq API key in the sidebar, or switch to Local Ollama.")
+        raise RuntimeError("No Groq API key is set. Add GROQ_API_KEY in the app's Secrets, or switch to Local Ollama.")
     return groq_chat(messages, model, api_key)
+
 
 def make_messages(section: str, history: List[Dict[str, str]], prompt: str, routed_expert: str) -> List[Dict[str, str]]:
     system = SECTION_PROMPTS[section]
@@ -97,6 +105,7 @@ def make_messages(section: str, history: List[Dict[str, str]], prompt: str, rout
     # Keep a bounded recent context to limit latency, token use, and accidental over-sharing.
     recent = history[-12:]
     return [{"role": "system", "content": system}] + recent + [{"role": "user", "content": prompt}]
+
 
 st.title("🛡️ Private AI Hub")
 st.caption("Two open-source project ideas combined in one Streamlit interface: wellbeing chat and routed expert chat.")
@@ -109,6 +118,7 @@ with st.sidebar:
         configured_groq_key = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
     except Exception:
         configured_groq_key = os.getenv("GROQ_API_KEY", "")
+
     provider_options = ["Local Ollama (privacy-first)", "Groq cloud API"]
     default_provider_index = 1 if configured_groq_key else 0
     provider = st.radio(
@@ -117,6 +127,7 @@ with st.sidebar:
         index=default_provider_index,
         help="Local Ollama keeps prompts on this machine for inference. Groq sends prompts to its cloud API.",
     )
+
     if provider == "Local Ollama (privacy-first)":
         model = st.text_input("Ollama model", value=os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL))
         ollama_url = st.text_input("Ollama chat endpoint", value=os.getenv("OLLAMA_URL", DEFAULT_OLLAMA_URL))
@@ -125,16 +136,19 @@ with st.sidebar:
     else:
         model = st.text_input("Groq model", value=os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL))
         ollama_url = DEFAULT_OLLAMA_URL
-           if configured_groq_key:
+        if configured_groq_key:
+            # The key stays on the server and is never shown to visitors.
             api_key = configured_groq_key
             st.caption("Groq key loaded from server settings.")
         else:
             api_key = st.text_input("Groq API key", type="password")
         st.warning("Cloud mode sends your prompts and included conversation context to Groq. Do not enter sensitive information.")
+
     st.divider()
     st.caption("Chats live in this Streamlit session only. Reloading the app clears the in-session history.")
 
 tab_wellbeing, tab_router, tab_general = st.tabs(["🌱 Wellbeing", "🧭 Smart routing", "💬 General chat"])
+
 
 def render_chat(section: str, container):
     history_key = f"history_{section.lower().replace(' ', '_')}"
@@ -174,6 +188,7 @@ def render_chat(section: str, container):
         if st.button(f"Clear {section} history", key=f"clear_{history_key}"):
             st.session_state[history_key] = []
             st.rerun()
+
 
 render_chat("Wellbeing", tab_wellbeing)
 render_chat("Smart routing", tab_router)
