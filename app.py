@@ -15,7 +15,7 @@ os.environ.setdefault("LANGSMITH_TRACING", "false")
 
 DEFAULT_OLLAMA_URL = "http://localhost:11434/api/chat"
 DEFAULT_OLLAMA_MODEL = "llama3.2"
-DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 
 SECTION_PROMPTS = {
     "Wellbeing": (
