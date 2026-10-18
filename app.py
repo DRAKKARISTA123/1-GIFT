@@ -66,7 +66,11 @@ def groq_chat(messages: List[Dict[str, str]], model: str, api_key: str) -> str:
     req = urllib.request.Request(
         "https://api.groq.com/openai/v1/chat/completions",
         data=payload,
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+      headers={
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {api_key}",
+    "User-Agent": "private-ai-hub/1.0",
+},
         method="POST",
     )
     try:
