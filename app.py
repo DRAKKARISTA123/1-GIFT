@@ -125,12 +125,11 @@ with st.sidebar:
     else:
         model = st.text_input("Groq model", value=os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL))
         ollama_url = DEFAULT_OLLAMA_URL
-        api_key = st.text_input(
-            "Groq API key",
-            value=configured_groq_key,
-            type="password",
-            help="For hosted deployments, preferably configure GROQ_API_KEY in Streamlit app Secrets instead of typing it here.",
-        )
+           if configured_groq_key:
+            api_key = configured_groq_key
+            st.caption("Groq key loaded from server settings.")
+        else:
+            api_key = st.text_input("Groq API key", type="password")
         st.warning("Cloud mode sends your prompts and included conversation context to Groq. Do not enter sensitive information.")
     st.divider()
     st.caption("Chats live in this Streamlit session only. Reloading the app clears the in-session history.")
